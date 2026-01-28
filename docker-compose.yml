@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Service Discovery - debe iniciar primero
+  service-discovery:
+    build:
+      context: ./ServiceDiscovery
+      dockerfile: Dockerfile
+    container_name: service-discovery
+    ports:
+      - "5000:80"
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # API Cliente - Solo accesible a través del Gateway
+  api-cliente:
+    build:
+      context: ./ApiCliente
+      dockerfile: Dockerfile
+    container_name: api-cliente
+    # Sin ports expuestos - solo accesible internamente via Gateway
+    expose:
+      - "80"
+    networks:
+      - microservices-network
+    depends_on:
+      - service-discovery
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+
+  # API Empresa - Solo accesible a través del Gateway
+  api-empresa:
+    build:
+      context: ./ApiEmpresa
+      dockerfile: Dockerfile
+    container_name: api-empresa
+    # Sin ports expuestos - solo accesible internamente via Gateway
+    expose:
+      - "80"
+    networks:
+      - microservices-network
+    depends_on:
+      - service-discovery
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+
+  # API Gateway - punto de entrada único
+  api-gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5003:80"
+    networks:
+      - microservices-network
+    depends_on:
+      - service-discovery
+      - api-cliente
+      - api-empresa
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ServiceDiscovery__Url=http://service-discovery:80
+
+networks:
+  microservices-network:
+    driver: bridge
